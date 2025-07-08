@@ -30,8 +30,8 @@ A PyTorch project for image recognition that implements a Convolutional Neural N
 
 ```bash
 # Clone repository
-git clone https://github.com/DanielsRT/pytorch-image-recognition.git
-cd pytorch-image-recognition
+git clone https://github.com/DanielsRT/cifar10-cnn-classifier.git
+cd cifar10-cnn-classifier
 
 # Install dependencies
 pip install -r requirements.txt
