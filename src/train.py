@@ -17,6 +17,7 @@ python train.py [--epochs 20] [--batch_size 64] [--lr 0.001] [--device cuda]
 """
 
 import argparse
+import os
 import time
 import torch
 import torch.nn as nn
@@ -45,3 +46,47 @@ def parse_args():
     parser.add_argument('--augment', action='store_true',
                         help='Enable data augmentation (default: False)')
     return parser.parse_args()
+
+def main():
+    # Parse command-line arguments
+    args = parse_args()
+
+    # Set device
+    if args.device == 'auto':
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        device = torch.device(args.device)
+    print(f"Using device: {device}")
+
+    # Create directories
+    for d in [args.model_dir, args.results_dir]:
+        os.makedirs(d, exists_ok=True)
+
+    # Load data with optional augmentation
+    train_loader, test_loader, class_names = load_data(
+        data_dir=args.data_dir,
+        batch_size=args.batch_size,
+        augment=args.augment
+    )
+    print(f"Loaded CIFAR-10 dataset with {len(class_names)} classes")
+    print(f"Training batches: {len(train_loader)}, Test batches: {len(test_loader)}")
+
+    # Initialize model
+    model = initialize_model(device=device, num_classes=len(class_names))
+
+    # Define loss function and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
+
+    # Learning rate scheduler
+    scheduler = ReduceLROnPlateau(
+        optimizer,
+        mode='max', # Monitor validation accuracy
+        factor=0.5,
+        patience=3,
+        verbose=True
+    )
+
+    # Training variables
+    best_val_accuracy = 0.0
+    train_losses, train_accuracies, val_accuracies = [], [], []
