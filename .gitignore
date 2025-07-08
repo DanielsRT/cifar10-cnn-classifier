@@ -1,6 +1,39 @@
-data
-models
+# Data directories
+/data/           
+/data/*          
+
+# Model checkpoints
+/models/         
+/models/*        
+
+# Runtime outputs
+/results/        
+/predictions/    
+
+# Environment files
+venv/            
+.env             
+.DS_Store        
+
+# IDE configurations
+.idea/           
+.vscode/         
+
+# Python artifacts
+__pycache__/     
+*.pyc            
+*.pyo            
+*.pyd            
+
+# Jupyter notebooks
+.ipynb_checkpoints/  
+
+# Log files
+*.log            
+logs/            
+
+# System files
+thumbs.db        
+
+# Image input 
 images
-predictions
-results
-src/__pycache__
