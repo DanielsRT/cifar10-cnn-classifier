@@ -3,8 +3,10 @@ import numpy as np
 import torch
 import torchvision
 import os
+import time
 from PIL import Image
 from torchvision import transforms
+from sklearn.metrics import confusion_matrix
 
 def load_data(batch_size=64, data_dir='./data', augment=False):
     """
@@ -114,7 +116,7 @@ def load_model(model, path='models/cifar_model.pth'):
     """
     Load model weights from file
     """
-    model.load_state_dict(torch.load(path))
+    model.load_state_dict(torch.load(path, weights_only=True))
     model.eval()  # Set to evaluation mode
     print(f"Model loaded from {path}")
     return model
@@ -166,6 +168,128 @@ def plot_metrics(train_losses, train_accs, val_accs, save_path=None):
     
     # Close the figure to free memory
     plt.close()
+
+def plot_confusion_matrix(true_labels, pred_labels, class_names, save_path=None):
+    """Generate and visualize confusion matrix"""
+    # Compute confusion matrix
+    cm = confusion_matrix(true_labels, pred_labels)
+    
+    # Normalize by true labels
+    cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 10))
+    im = ax.imshow(cm_norm, interpolation='nearest', cmap=plt.cm.Blues)
+    ax.figure.colorbar(im, ax=ax)
+    
+    # Set labels
+    ax.set(
+        xticks=np.arange(cm.shape[1]),
+        yticks=np.arange(cm.shape[0]),
+        xticklabels=class_names,
+        yticklabels=class_names,
+        title='Normalized Confusion Matrix',
+        ylabel='True Label',
+        xlabel='Predicted Label'
+    )
+    
+    # Rotate tick labels
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    
+    # Add text annotations
+    fmt = '.2f'
+    thresh = cm_norm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            ax.text(j, i, 
+                    f"{cm_norm[i, j]:.2f}\n({cm[i, j]})", 
+                    ha="center", va="center",
+                    color="white" if cm_norm[i, j] > thresh else "black")
+    
+    fig.tight_layout()
+    
+    # Save or show
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Confusion matrix saved to {save_path}")
+    else:
+        plt.show()
+    
+    plt.close()
+
+def plot_misclassified_samples(samples, class_names, save_path=None, num_cols=4):
+    """Display grid of misclassified samples"""
+    num_samples = len(samples)
+    num_rows = (num_samples + num_cols - 1) // num_cols
+    
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 3 * num_rows))
+    fig.suptitle('Misclassified Samples', fontsize=16)
+    
+    for i, (img, true_label, pred_label) in enumerate(samples):
+        ax = axes[i // num_cols, i % num_cols] if num_rows > 1 else axes[i]
+        
+        # Unnormalize and display image
+        img = img / 2 + 0.5  # Unnormalize
+        npimg = img.numpy()
+        ax.imshow(np.transpose(npimg, (1, 2, 0)))
+        
+        # Set title with true/pred labels
+        true_name = class_names[true_label]
+        pred_name = class_names[pred_label]
+        ax.set_title(f"True: {true_name}\nPred: {pred_name}", fontsize=10)
+        ax.axis('off')
+    
+    # Hide empty subplots
+    for i in range(num_samples, num_rows * num_cols):
+        ax = axes[i // num_cols, i % num_cols] if num_rows > 1 else axes[i]
+        ax.axis('off')
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Misclassified samples plot saved to {save_path}")
+    else:
+        plt.show()
+    
+    plt.close()
+
+def benchmark_inference(model, device, input_size=(3, 32, 32), num_runs=100):
+    """Benchmark model inference speed"""
+    model.eval()
+    
+    # Create dummy input
+    dummy_input = torch.randn(1, *input_size).to(device)
+    
+    # Warm up GPU
+    print("\nBenchmarking inference speed...")
+    for _ in range(10):
+        _ = model(dummy_input)
+    
+    # Time inference
+    if device.type == 'cuda':
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        
+        start.record()
+        for _ in range(num_runs):
+            _ = model(dummy_input)
+        end.record()
+        torch.cuda.synchronize()
+        avg_time = start.elapsed_time(end) / num_runs
+    else:
+        start_time = time.time()
+        for _ in range(num_runs):
+            _ = model(dummy_input)
+        avg_time = (time.time() - start_time) * 1000 / num_runs
+    
+    print(f"Average inference time: {avg_time:.2f} ms")
+    
+    # Calculate theoretical FPS
+    fps = 1000 / avg_time if avg_time > 0 else float('inf')
+    print(f"Theoretical FPS: {fps:.2f} (batch size 1)")
+    
+    return avg_time
 
 def calculate_accuracy(outputs, labels):
     """

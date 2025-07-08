@@ -20,9 +20,9 @@ import time
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import classification_report
 from model import initialize_model
-from utils import load_data, load_model, evaluate_model
+from utils import load_data, load_model, evaluate_model, plot_confusion_matrix, plot_misclassified_samples, benchmark_inference
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch Model Evaluation')
@@ -65,7 +65,6 @@ def main():
 
     # Load trained weights
     model = load_model(model, args.model_path)
-    print(f"Loaded model from {args.model_path}")
 
     # Evaluate model
     print("\nEvaluating model on test set...")
@@ -83,4 +82,41 @@ def main():
     print(f"\nEvaluation completed in {test_time:.2f} seconds")
     print(f"Test Accuracy: {accuracy * 100:.2f}%")
 
-    
+    # Generate and save classification report
+    report = classification_report(
+        all_labels,
+        all_preds,
+        target_names=class_names,
+        digits=4
+    )
+    print("\nClassification Report:\n", report)
+
+    # Save report to file
+    report_path = os.path.join(args.results_dir, 'classification_report.txt')
+    with open(report_path, 'w') as f:
+        f.write(report)
+    print(f"Classification report saved to {report_path}")
+
+    # Generate and plot confusion matrix
+    plot_confusion_matrix(
+        all_labels,
+        all_preds,
+        class_names,
+        save_path=os.path.join(args.results_dir, 'confusion_matrix.png')
+    )
+
+    # Plot misclassified samples
+    if misclassified_samples:
+        plot_misclassified_samples(
+            misclassified_samples,
+            class_names,
+            save_path=os.path.join(args.results_dir, 'misclassified_samples.png')
+        )
+
+    # Benchmark inference speed
+    benchmark_inference(model, device, input_size=(3, 32, 32), num_runs=100)
+
+    print("\nEvaluation complete. Results saved to", args.results_dir)
+
+if __name__ == "__main__":
+    main()
