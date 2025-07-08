@@ -24,7 +24,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from model import initialize_model
-from utils import load_data, save_model, plot_metrics, calculate_accuracy
+from utils import load_data, save_model, plot_metrics, validate_model
 
 # Argument parser
 def parse_args():
@@ -60,7 +60,7 @@ def main():
 
     # Create directories
     for d in [args.model_dir, args.results_dir]:
-        os.makedirs(d, exists_ok=True)
+        os.makedirs(d, exist_ok=True)
 
     # Load data with optional augmentation
     train_loader, test_loader, class_names = load_data(
@@ -84,7 +84,6 @@ def main():
         mode='max', # Monitor validation accuracy
         factor=0.5,
         patience=3,
-        verbose=True
     )
 
     # Training variables
@@ -94,7 +93,7 @@ def main():
     # Training loop
     print("\nStarting training...")
     for epoch in range(1, args.epochs + 1):
-        epoch_start_time = time.time()
+        epoch_start = time.time()
         model.train()
 
         # Per-epoch metrics
@@ -130,4 +129,43 @@ def main():
                       f"| Loss: {loss.item():.4f} | Acc: {batch_acc:.2f}%")
                 
         # Calculate epoch training metrics
-        
+        epoch_loss = running_loss / total_samples
+        epoch_accuracy = 100 * running_correct / total_samples
+        train_losses.append(epoch_loss)
+        train_accuracies.append(epoch_accuracy)
+
+        # Validation phase
+        val_accuracy = validate_model(model, test_loader, device)
+        val_accuracies.append(val_accuracy)
+
+        # Update learning rate
+        scheduler.step(val_accuracy)
+
+        # Save best model
+        if val_accuracy > best_val_accuracy:
+            best_val_accuracy = val_accuracy
+            model_path = os.path.join(args.model_dir, 'best_model.pth')
+            save_model(model, model_path)
+            print(f"Saved new best model with accuracy: {best_val_accuracy:.2f}%")
+
+        # Epoch summary
+        epoch_time = time.time() - epoch_start
+        print(f"Epoch [{epoch}/{args.epochs}] completed in {epoch_time:.1f}s ")
+        print(f"Training Loss: {epoch_loss:.4f} | Training Acc: {epoch_accuracy:.2f}% | Val Acc: {val_accuracy:.2f}%")
+        print("-" * 70)
+
+    # Save final model
+    final_model_path = os.path.join(args.model_dir, 'final_model.pth')
+    save_model(model, final_model_path)
+
+    # Plot and save training metrics
+    plot_metrics(train_losses, train_accuracies, val_accuracies, save_path=os.path.join(args.results_dir, 'training_metrics.png'))
+
+    print("\nTraining completed!")
+    print(f"Best validation accuracy: {best_val_accuracy:.2f}%")
+    print(f"Models saved to: {args.model_dir}")
+    print(f"Results saved to: {args.results_dir}")
+
+
+if __name__ == "__main__":
+    main()
