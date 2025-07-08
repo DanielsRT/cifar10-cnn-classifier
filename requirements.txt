@@ -1,0 +1,13 @@
+# Core Requirements
+torch            # PyTorch main library (CPU version)
+torchvision       # Computer vision datasets, models and transforms
+numpy             # Numerical computing and array operations
+matplotlib         # Plotting and visualization
+pillow             # Image processing (PIL fork)
+scikit-learn       # Evaluation metrics (classification report, confusion matrix)
+
+# Platform-Specific Notes:
+# For GPU acceleration, install PyTorch with CUDA support from:
+# https://pytorch.org/get-started/locally/
+# Example GPU command: 
+# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
