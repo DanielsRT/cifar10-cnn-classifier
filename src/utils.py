@@ -4,7 +4,9 @@ import torch
 import torchvision
 import os
 import time
-from PIL import Image
+import csv
+import torch.nn.functional as F
+from PIL import Image, ImageDraw, ImageFont
 from torchvision import transforms
 from sklearn.metrics import confusion_matrix
 
@@ -111,6 +113,26 @@ def save_model(model, path='models/cifar_model.pth'):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     torch.save(model.state_dict(), path)
     print(f"Model saved to {path}")
+
+def load_and_preprocess_image(image_path, device, img_size=32):
+    """Load and preprocess image for model input"""
+    # Load image
+    image = Image.open(image_path).convert('RGB')
+    original_size = image.size
+    
+    # Define transformations
+    transform = transforms.Compose([
+        transforms.Resize(img_size),
+        transforms.CenterCrop(img_size),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), 
+                             (0.2470, 0.2435, 0.2616))
+    ])
+    
+    # Apply transformations
+    input_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension
+    
+    return image, input_tensor
 
 def load_class_names(class_names_arg):
     """Load class names from argument or default to CIFAR-10"""
@@ -277,6 +299,35 @@ def plot_misclassified_samples(samples, class_names, save_path=None, num_cols=4)
     
     plt.close()
 
+def predict_image(model, input_tensor, class_names, top_k=3, conf_threshold=0.01):
+    """Make prediction on input tensor"""
+    model.eval()
+    
+    with torch.no_grad():
+        # Forward pass
+        outputs = model(input_tensor)
+        
+        # Apply softmax to get probabilities
+        probabilities = F.softmax(outputs, dim=1)
+        
+        # Get top predictions
+        top_probs, top_idxs = torch.topk(probabilities, k=top_k)
+        top_probs = top_probs.squeeze().cpu().numpy()
+        top_idxs = top_idxs.squeeze().cpu().numpy()
+        
+        # Filter by confidence threshold
+        valid_mask = top_probs >= conf_threshold
+        top_probs = top_probs[valid_mask]
+        top_idxs = top_idxs[valid_mask]
+        
+        # Get class names and confidences
+        confidences = [float(prob) for prob in top_probs]
+        top_classes = [class_names[idx] for idx in top_idxs]
+        pred_class = top_classes[0]
+        pred_idx = top_idxs[0]
+    
+    return pred_class, pred_idx, confidences, top_classes
+
 def benchmark_inference(model, device, input_size=(3, 32, 32), num_runs=100):
     """Benchmark model inference speed"""
     model.eval()
@@ -323,26 +374,79 @@ def calculate_accuracy(outputs, labels):
     correct = (predicted == labels).sum().item()
     return 100 * correct / total
 
-def predict_image(model, image_path, class_names, transform=None):
-    """
-    Make prediction on a single image
-    """
-    if transform is None:
-        transform = transforms.Compose([
-            transforms.Resize((32, 32)),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-    
-    image = Image.open(image_path)
-    image = transform(image).unsqueeze(0)  # Add batch dimension
+def predict_image(model, input_tensor, class_names, top_k=3, conf_threshold=0.01):
+    """Make prediction on input tensor"""
+    model.eval()
     
     with torch.no_grad():
-        outputs = model(image)
-        _, predicted = torch.max(outputs, 1)
-        class_idx = predicted.item()
+        # Forward pass
+        outputs = model(input_tensor)
+        
+        # Apply softmax to get probabilities
+        probabilities = F.softmax(outputs, dim=1)
+        
+        # Get top predictions
+        top_probs, top_idxs = torch.topk(probabilities, k=top_k)
+        top_probs = top_probs.squeeze().cpu().numpy()
+        top_idxs = top_idxs.squeeze().cpu().numpy()
+        
+        # Filter by confidence threshold
+        valid_mask = top_probs >= conf_threshold
+        top_probs = top_probs[valid_mask]
+        top_idxs = top_idxs[valid_mask]
+        
+        # Get class names and confidences
+        confidences = [float(prob) for prob in top_probs]
+        top_classes = [class_names[idx] for idx in top_idxs]
+        pred_class = top_classes[0]
+        pred_idx = top_idxs[0]
     
-    return class_names[class_idx]
+    return pred_class, pred_idx, confidences, top_classes
+
+def save_prediction_vis(image, pred_class, confidence, top_classes, confidences, save_path):
+    """Create and save image with prediction overlay"""
+    # Create a copy to draw on
+    vis_image = image.copy()
+    draw = ImageDraw.Draw(vis_image)
+    
+    try:
+        # Try to load a TTF font
+        font = ImageFont.truetype("arial.ttf", 16)
+    except IOError:
+        # Fallback to default font
+        font = ImageFont.load_default()
+        print("Warning: Using basic font - install arial.ttf for better visuals")
+    
+    # Get image size
+    width, height = vis_image.size
+    
+    # Draw prediction box
+    box_height = 30 + 20 * len(top_classes)
+    draw.rectangle([(0, 0), (width, box_height)], fill='black')
+    
+    # Draw main prediction
+    main_text = f"{pred_class}: {confidence:.1%}"
+    draw.text((10, 5), main_text, fill="white", font=font)
+    
+    # Draw top predictions
+    for i, (cls, conf) in enumerate(zip(top_classes, confidences)):
+        y_pos = 30 + i * 20
+        text = f"{i+1}. {cls}: {conf:.1%}"
+        color = "lime" if i == 0 else "yellow"
+        draw.text((10, y_pos), text, fill=color, font=font)
+    
+    # Save image
+    vis_image.save(save_path)
+
+def save_results_csv(results, output_path):
+    """Save prediction results to CSV file"""
+    with open(output_path, 'w', newline='') as csvfile:
+        fieldnames = ['image', 'prediction', 'confidence', 'time_ms', 'top_predictions']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        
+        writer.writeheader()
+        for result in results:
+            writer.writerow(result)
 
 def validate_model(model, test_loader, device):
     """Evaluate model on validation set."""
