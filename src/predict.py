@@ -17,12 +17,8 @@ python predict.py --model models/best_model.pth --input images/ --output predict
 
 import argparse
 import os
-import csv
 import time
 import torch
-import torch.nn.functional as F
-from PIL import Image, ImageDraw, ImageFont
-import matplotlib.pyplot as plt
 from model import initialize_model
 from utils import load_model, load_class_names, load_and_preprocess_image, predict_image, save_prediction_vis, save_results_csv
 

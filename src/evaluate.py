@@ -19,7 +19,6 @@ import os
 import time
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 from model import initialize_model
 from utils import load_data, load_model, evaluate_model, plot_confusion_matrix, plot_misclassified_samples, benchmark_inference
