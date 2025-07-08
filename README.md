@@ -30,7 +30,7 @@ A PyTorch project for image recognition that implements a Convolutional Neural N
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/pytorch-image-recognition.git
+git clone https://github.com/DanielsRT/pytorch-image-recognition.git
 cd pytorch-image-recognition
 
 # Install dependencies
