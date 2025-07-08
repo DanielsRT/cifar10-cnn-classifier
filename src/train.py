@@ -90,3 +90,44 @@ def main():
     # Training variables
     best_val_accuracy = 0.0
     train_losses, train_accuracies, val_accuracies = [], [], []
+
+    # Training loop
+    print("\nStarting training...")
+    for epoch in range(1, args.epochs + 1):
+        epoch_start_time = time.time()
+        model.train()
+
+        # Per-epoch metrics
+        running_loss = 0.0
+        running_correct = 0
+        total_samples = 0
+
+        # Mini-batch training
+        for batch_idx, (inputs, labels) in enumerate(train_loader):
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            # Zero the parameter gradients
+            optimizer.zero_grad()
+
+            # Forward pass
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            # Backward pass and optimization
+            loss.backward()
+            optimizer.step()
+
+            # Calculate metrics
+            running_loss += loss.item() * inputs.size(0)
+            _, predicted = torch.max(outputs, 1)
+            running_correct += (predicted == labels).sum().item()
+            total_samples += labels.size(0)
+
+            # Print progress every 100 batches
+            if batch_idx % 100 == 0:
+                batch_acc = 100 * running_correct / total_samples
+                print(f"Epoch [{epoch}/{args.epochs}] | Batch [{batch_idx}/{len(train_loader)}] "
+                      f"| Loss: {loss.item():.4f} | Acc: {batch_acc:.2f}%")
+                
+        # Calculate epoch training metrics
+        
