@@ -112,6 +112,29 @@ def save_model(model, path='models/cifar_model.pth'):
     torch.save(model.state_dict(), path)
     print(f"Model saved to {path}")
 
+def load_class_names(class_names_arg):
+    """Load class names from argument or default to CIFAR-10"""
+    if class_names_arg:
+        # Try loading from file
+        if os.path.isfile(class_names_arg):
+            with open(class_names_arg, 'r') as f:
+                class_names = [line.strip() for line in f.readlines()]
+        # Parse comma-separated list
+        elif ',' in class_names_arg:
+            class_names = [name.strip() for name in class_names_arg.split(',')]
+        else:
+            class_names = [class_names_arg]
+    else:
+        # Default to CIFAR-10 classes
+        class_names = [
+            'airplane', 'automobile', 'bird', 'cat', 'deer',
+            'dog', 'frog', 'horse', 'ship', 'truck'
+        ]
+        print("Using default CIFAR-10 class names")
+    
+    print(f"Loaded {len(class_names)} classes")
+    return class_names
+
 def load_model(model, path='models/cifar_model.pth'):
     """
     Load model weights from file
