@@ -22,7 +22,7 @@ import torch
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, classification_report
 from model import initialize_model
-from utils import load_data, load_model
+from utils import load_data, load_model, evaluate_model
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch Model Evaluation')
@@ -68,4 +68,19 @@ def main():
     print(f"Loaded model from {args.model_path}")
 
     # Evaluate model
+    print("\nEvaluating model on test set...")
+    test_start = time.time()
+    all_labels, all_preds, misclassified_samples = evaluate_model(
+        model,
+        test_loader,
+        device,
+        args.num_misclassified
+    )
+    test_time = time.time() - test_start
+
+    # Calculate overall accuracy
+    accuracy = np.sum(all_labels == all_preds) / len(all_labels)
+    print(f"\nEvaluation completed in {test_time:.2f} seconds")
+    print(f"Test Accuracy: {accuracy * 100:.2f}%")
+
     

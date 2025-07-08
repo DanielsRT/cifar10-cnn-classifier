@@ -216,3 +216,38 @@ def validate_model(model, test_loader, device):
 
     accuracy = 100 * total_correct / total_samples
     return accuracy
+
+def evaluate_model(model, test_loader, device, num_misclassified=16):
+    """Evaluate model and collect predictions"""
+    model.eval()  # Set model to evaluation mode
+    
+    # Initialize collections
+    all_labels = []
+    all_preds = []
+    misclassified_samples = []  # Store (image, true_label, pred_label)
+    
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            
+            # Forward pass
+            outputs = model(images)
+            _, preds = torch.max(outputs, 1)
+            
+            # Collect predictions and labels
+            all_labels.extend(labels.cpu().numpy())
+            all_preds.extend(preds.cpu().numpy())
+            
+            # Collect misclassified samples
+            mis_mask = (preds != labels)
+            mis_images = images[mis_mask]
+            mis_labels = labels[mis_mask]
+            mis_preds = preds[mis_mask]
+            
+            for i in range(min(len(mis_images), num_misclassified - len(misclassified_samples))):
+                img = mis_images[i].cpu()
+                true_label = mis_labels[i].item()
+                pred_label = mis_preds[i].item()
+                misclassified_samples.append((img, true_label, pred_label))
+    
+    return np.array(all_labels), np.array(all_preds), misclassified_samples
